@@ -334,3 +334,186 @@ PC3> ping 60.100.0.10
 84 bytes from 60.100.0.10 icmp_seq=4 ttl=252 time=67.546 ms
 84 bytes from 60.100.0.10 icmp_seq=5 ttl=252 time=72.439 ms
 ```
+
+## Mikrotik
+![topologia](../img/ripv2_mikrotik.png)
+### Configuración
+Primero se configuran las interfaces con las direcciones IP que estamos utilizando en cada una.
+#### Router_A
+``` 
+MikroTik 6.47 (stable)
+MikroTik Login: admin
+Password:
+[admin@MikroTik] > interface bridge
+[admin@MikroTik] /interface bridge> add name=loopback0 protocol-mode=none
+[admin@MikroTik] /interface bridge> .. ..
+[admin@MikroTik] > ip address
+[admin@MikroTik] /ip address> add address=192.168.6.1/24 interface=ether1
+[admin@MikroTik] /ip address> add address=192.168.7.1/30 interface=ether2
+[admin@MikroTik] /ip address> add address=4.4.4.4/32 interface=loopback0
+[admin@MikroTik] /ip address> print
+Flags: X - disabled, I - invalid, D - dynamic
+ #   ADDRESS            NETWORK         INTERFACE
+ 0   192.168.6.1/24     192.168.6.0     ether1
+ 1   192.168.7.1/30     192.168.7.0     ether2
+ 2   4.4.4.4/32         4.4.4.4         loopback0
+[admin@MikroTik] /ip address> .. ..
+[admin@MikroTik] >
+```
+#### Router_B
+``` 
+MikroTik 6.47 (stable)
+MikroTik Login: admin
+Password:
+[admin@MikroTik] > interface bridge
+[admin@MikroTik] /interface bridge> add name=loopback0 protocol-mode=none
+[admin@MikroTik] /interface bridge> .. ..
+[admin@MikroTik] > ip address
+[admin@MikroTik] /ip address> add address=192.168.8.1/24 interface=ether1
+[admin@MikroTik] /ip address> add address=192.168.7.2/30 interface=ether2
+[admin@MikroTik] /ip address> add address=192.168.9.2/30 interface=ether3
+[admin@MikroTik] /ip address> add address=5.5.5.5/32 interface=loopback0
+[admin@MikroTik] /ip address> print
+Flags: X - disabled, I - invalid, D - dynamic
+ #   ADDRESS            NETWORK         INTERFACE
+ 0   5.5.5.5/32         5.5.5.5         loopback0
+ 1   192.168.7.2/30     192.168.7.0     ether2
+ 2   192.168.8.1/24     192.168.8.0     ether1
+ 3   192.168.9.2/30     192.168.9.0     ether3
+
+[admin@MikroTik] /ip address> .. ..
+[admin@MikroTik] >
+```
+#### Router_C
+``` 
+MikroTik 6.47 (stable)
+MikroTik Login: admin
+Password:
+[admin@MikroTik] > interface bridge
+[admin@MikroTik] /interface bridge> add name=loopback0 protocol-mode=none
+[admin@MikroTik] /interface bridge> .. ..
+[admin@MikroTik] > ip address
+[admin@MikroTik] /ip address> add address=192.168.10.1/24 interface=ether1
+[admin@MikroTik] /ip address> add address=192.168.9.1/30 interface=ether2
+[admin@MikroTik] /ip address> add address=6.6.6.6/32 interface=loopback0
+[admin@MikroTik] /ip address> print
+Flags: X - disabled, I - invalid, D - dynamic
+ #   ADDRESS            NETWORK         INTERFACE
+ 0   6.6.6.6/32         6.6.6.6         loopback0
+ 1   192.168.9.1/30     192.168.9.0     ether2
+ 2   192.168.10.1/24    192.168.10.0    ether1
+[admin@MikroTik] /ip address> .. ..
+[admin@MikroTik] >
+```
+Luego, configuramos RIPv2 en cada uno de los routers y le indicamos que redes deben anunciar.
+#### Router_A
+```
+[admin@MikroTik] > routing rip network
+[admin@MikroTik] /routing rip network> add network=192.168.6.0/24 disabled=no
+[admin@MikroTik] /routing rip network> add network=192.168.7.0/30 disabled=no
+[admin@MikroTik] /routing rip network> add network=4.4.4.4/32 disabled=no
+```
+#### Router_B
+```
+[admin@MikroTik] > routing rip network
+[admin@MikroTik] /routing rip network> add network=192.168.7.0/30 disabled=no
+[admin@MikroTik] /routing rip network> add network=192.168.8.0/24 disabled=no
+[admin@MikroTik] /routing rip network> add network=192.168.9.0/30 disabled=no
+[admin@MikroTik] /routing rip network> add network=5.5.5.5/32 disabled=no
+```
+#### Router_C
+```
+[admin@MikroTik] > routing rip network
+[admin@MikroTik] /routing rip network> add network=192.168.9.0/30 disabled=no
+[admin@MikroTik] /routing rip network> add network=192.168.10.0/24 disabled=no
+[admin@MikroTik] /routing rip network> add network=6.6.6.6/32 disabled=
+```
+### Verificación de las direcciones aprendidas
+#### Router_A
+```
+[admin@MikroTik] /routing rip network> .. .. .. ip route
+[admin@MikroTik] /ip route> print
+Flags: X - disabled, A - active, D - dynamic, C - connect, S - static, r - rip, b - bgp, o - ospf, m - mme,
+B - blackhole, U - unreachable, P - prohibit
+ #      DST-ADDRESS        PREF-SRC        GATEWAY            DISTANCE
+ 0 ADC  4.4.4.4/32         4.4.4.4         loopback0                 0
+ 1 ADr  5.5.5.5/32                         192.168.7.2             120
+ 2 ADr  6.6.6.6/32                         192.168.7.2             120
+ 3 ADC  192.168.6.0/24     192.168.6.1     ether1                    0
+ 4 ADC  192.168.7.0/30     192.168.7.1     ether2                    0
+ 5 ADr  192.168.8.0/24                     192.168.7.2             120
+ 6 ADr  192.168.9.0/30                     192.168.7.2             120
+ 7 ADr  192.168.10.0/24                    192.168.7.2             120
+[admin@MikroTik] /ip route>
+```
+#### Router_B
+```
+[admin@MikroTik] /routing rip network> .. .. .. ip route
+[admin@MikroTik] /ip route> print
+Flags: X - disabled, A - active, D - dynamic, C - connect, S - static, r - rip, b - bgp, o - ospf, m - mme,
+B - blackhole, U - unreachable, P - prohibit
+ #      DST-ADDRESS        PREF-SRC        GATEWAY            DISTANCE
+ 0 ADr  4.4.4.4/32                         192.168.7.1             120
+ 1 ADC  5.5.5.5/32         5.5.5.5         loopback0                 0
+ 2 ADr  6.6.6.6/32                         192.168.9.1             120
+ 3 ADr  192.168.6.0/24                     192.168.7.1             120
+ 4 ADC  192.168.7.0/30     192.168.7.2     ether2                    0
+ 5 ADC  192.168.8.0/24     192.168.8.1     ether1                    0
+ 6 ADC  192.168.9.0/30     192.168.9.2     ether3                    0
+ 7 ADr  192.168.10.0/24                    192.168.9.1             120
+[admin@MikroTik] /ip route>
+```
+#### Router_C
+```
+[admin@MikroTik] /routing rip network> .. .. .. ip route
+[admin@MikroTik] /ip route> print
+Flags: X - disabled, A - active, D - dynamic, C - connect, S - static, r - rip, b - bgp, o - ospf, m - mme,
+B - blackhole, U - unreachable, P - prohibit
+ #      DST-ADDRESS        PREF-SRC        GATEWAY            DISTANCE
+ 0 ADr  4.4.4.4/32                         192.168.9.2             120
+ 1 ADr  5.5.5.5/32                         192.168.9.2             120
+ 2 ADC  6.6.6.6/32         6.6.6.6         loopback0                 0
+ 3 ADr  192.168.6.0/24                     192.168.9.2             120
+ 4 ADr  192.168.7.0/30                     192.168.9.2             120
+ 5 ADr  192.168.8.0/24                     192.168.9.2             120
+ 6 ADC  192.168.9.0/30     192.168.9.1     ether2                    0
+ 7 ADC  192.168.10.0/24    192.168.10.1    ether1                    0
+[admin@MikroTik] /ip route>
+```
+### Configuración del router de internet
+#### M_INTERNET
+```
+[admin@MikroTik] > interface bridge
+[admin@MikroTik] /interface bridge> add name=loop_internet protocol-mode=none
+[admin@MikroTik] /interface bridge> .. ..
+[admin@MikroTik] > ip address
+[admin@MikroTik] /ip address> add address=200.18.17.10/30 interface=ether1
+[admin@MikroTik] /ip address> add address=60.100.0.10/32 interface=loop_internet
+
+[admin@MikroTik] /ip address> .. dhcp-server
+[admin@MikroTik] ip dhcp-server> setup
+Select interface to run DHCP server on
+
+dhcp server interface: ether1
+Select network for DHCP addresses
+
+dhcp address space: 200.18.18.8/30
+Select gateway for given network
+
+gateway for dhcp network: 200.18.17.10
+Select pool of ip addresses given out by DHCP server
+
+dns servers: 200.18.17.10
+Select lease time
+
+lease time: 3d
+[admin@MikroTik] ip dhcp-server>
+```
+#### Router_A
+```
+/ip dhcp-client add interface=ether3 disabled=no
+```
+|---- por terminar ----|
+
+ruta default, propagada
+y pruebas de ping
