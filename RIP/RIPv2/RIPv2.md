@@ -261,7 +261,7 @@ PC2> ip 192.168.3.2 255.255.255.0 192.168.3.1
 ```
 #### En la PC3
 ```
-PC1> ip 192.168.5.2 255.255.255.0 192.168.5.1
+PC3> ip 192.168.5.2 255.255.255.0 192.168.5.1
 ```
 
 ### Pruebas de ICMP
@@ -339,7 +339,7 @@ PC3> ping 60.100.0.10
 ![topologia](../img/ripv2_mikrotik.png)
 ### Configuración
 Primero se configuran las interfaces con las direcciones IP que estamos utilizando en cada una.
-#### Router_A
+#### Mikrotik_A
 ``` 
 MikroTik 6.47 (stable)
 MikroTik Login: admin
@@ -360,7 +360,7 @@ Flags: X - disabled, I - invalid, D - dynamic
 [admin@MikroTik] /ip address> .. ..
 [admin@MikroTik] >
 ```
-#### Router_B
+#### Mikrotik_B
 ``` 
 MikroTik 6.47 (stable)
 MikroTik Login: admin
@@ -384,7 +384,7 @@ Flags: X - disabled, I - invalid, D - dynamic
 [admin@MikroTik] /ip address> .. ..
 [admin@MikroTik] >
 ```
-#### Router_C
+#### Mikrotik_C
 ``` 
 MikroTik 6.47 (stable)
 MikroTik Login: admin
@@ -406,14 +406,14 @@ Flags: X - disabled, I - invalid, D - dynamic
 [admin@MikroTik] >
 ```
 Luego, configuramos RIPv2 en cada uno de los routers y le indicamos que redes deben anunciar.
-#### Router_A
+#### Mikrotik_A
 ```
 [admin@MikroTik] > routing rip network
 [admin@MikroTik] /routing rip network> add network=192.168.6.0/24 disabled=no
 [admin@MikroTik] /routing rip network> add network=192.168.7.0/30 disabled=no
 [admin@MikroTik] /routing rip network> add network=4.4.4.4/32 disabled=no
 ```
-#### Router_B
+#### Mikrotik_B
 ```
 [admin@MikroTik] > routing rip network
 [admin@MikroTik] /routing rip network> add network=192.168.7.0/30 disabled=no
@@ -421,7 +421,7 @@ Luego, configuramos RIPv2 en cada uno de los routers y le indicamos que redes de
 [admin@MikroTik] /routing rip network> add network=192.168.9.0/30 disabled=no
 [admin@MikroTik] /routing rip network> add network=5.5.5.5/32 disabled=no
 ```
-#### Router_C
+#### Mikrotik_C
 ```
 [admin@MikroTik] > routing rip network
 [admin@MikroTik] /routing rip network> add network=192.168.9.0/30 disabled=no
@@ -429,7 +429,7 @@ Luego, configuramos RIPv2 en cada uno de los routers y le indicamos que redes de
 [admin@MikroTik] /routing rip network> add network=6.6.6.6/32 disabled=
 ```
 ### Verificación de las direcciones aprendidas
-#### Router_A
+#### Mikrotik_A
 ```
 [admin@MikroTik] /routing rip network> .. .. .. ip route
 [admin@MikroTik] /ip route> print
@@ -446,7 +446,7 @@ B - blackhole, U - unreachable, P - prohibit
  7 ADr  192.168.10.0/24                    192.168.7.2             120
 [admin@MikroTik] /ip route>
 ```
-#### Router_B
+#### Mikrotik_B
 ```
 [admin@MikroTik] /routing rip network> .. .. .. ip route
 [admin@MikroTik] /ip route> print
@@ -463,7 +463,7 @@ B - blackhole, U - unreachable, P - prohibit
  7 ADr  192.168.10.0/24                    192.168.9.1             120
 [admin@MikroTik] /ip route>
 ```
-#### Router_C
+#### Mikrotik_C
 ```
 [admin@MikroTik] /routing rip network> .. .. .. ip route
 [admin@MikroTik] /ip route> print
@@ -509,11 +509,158 @@ Select lease time
 lease time: 3d
 [admin@MikroTik] ip dhcp-server>
 ```
-#### Router_A
+#### Mikrotik_A
 ```
 /ip dhcp-client add interface=ether3 disabled=no
 ```
 |---- por terminar ----|
 
-ruta default, propagada
-y pruebas de ping
+### Ruta Default para salida a internet
+La idea es configurar la ruta default en el router A y redistribuirla por rip al resto de los routers.
+#### Mikrotik_A
+```
+[admin@MikroTik] /ip route> add dst-address=0.0.0.0/0 gateway=200.18.17.10
+[admin@MikroTik] /ip route> .. .. routing rip
+[admin@MikroTik] /routing rip>
+[admin@MikroTik] /routing rip> edit value-name=distribute-default
+// cambiar el valor a "always" y guardar //
+[admin@MikroTik] /routing rip> print
+      distribute-default: always
+     redistribute-static: yes
+  redistribute-connected: no
+       redistribute-ospf: no
+        redistribute-bgp: no
+          metric-default: 1
+           metric-static: 1
+        metric-connected: 1
+             metric-ospf: 1
+              metric-bgp: 1
+            update-timer: 30s
+           timeout-timer: 3m
+           garbage-timer: 2m
+           routing-table: main
+] /routing rip>
+```
+Luego de hacer la redistribución de la ruta default, podemos verificar en los otros routers que esta se haya propagado hacia ellos.
+#### Mikrotik_B
+```
+[admin@MikroTik] > ip route print
+Flags: X - disabled, A - active, D - dynamic, C - connect, S - static, r - rip, b - bgp, o - ospf, m - mme, B - blackhole, U - unreachable, P - prohibit
+ #      DST-ADDRESS        PREF-SRC        GATEWAY            DISTANCE
+ 0 ADr  0.0.0.0/0                          192.168.7.1             120
+ 1 ADr  4.4.4.4/32                         192.168.7.1             120
+ 2 ADC  5.5.5.5/32         5.5.5.5         loopback0                 0
+ 3 ADr  6.6.6.6/32                         192.168.9.1             120
+ 4 ADr  192.168.6.0/24                     192.168.7.1             120
+ 5 ADC  192.168.7.0/30     192.168.7.2     ether2                    0
+ 6 ADC  192.168.8.0/24     192.168.8.1     ether1                    0
+ 7 ADC  192.168.9.0/30     192.168.9.2     ether3                    0
+ 8 ADr  192.168.10.0/24                    192.168.9.1             120
+ [admin@MikroTik] >
+```
+#### Mikrotik_C
+```
+[admin@MikroTik] > ip route print
+Flags: X - disabled, A - active, D - dynamic, C - connect, S - static, r - rip, b - bgp, o - ospf, m - mme, B - blackhole, U - unreachable, P - prohibit
+ #      DST-ADDRESS        PREF-SRC        GATEWAY            DISTANCE
+ 0 ADr  0.0.0.0/0                          192.168.9.2             120
+ 1 ADr  4.4.4.4/32                         192.168.9.2             120
+ 2 ADr  5.5.5.5/32                         192.168.9.2             120
+ 3 ADC  6.6.6.6/32         6.6.6.6         loopback0                 0
+ 4 ADr  192.168.6.0/24                     192.168.9.2             120
+ 5 ADr  192.168.7.0/30                     192.168.9.2             120
+ 6 ADr  192.168.8.0/24                     192.168.9.2             120
+ 7 ADC  192.168.9.0/30     192.168.9.1     ether2                    0
+ 8 ADC  192.168.10.0/24    192.168.10.1    ether1                    0
+[admin@MikroTik] >
+```
+Ahora todos los routers utilizarán el router M_INTERNET como salida default, pero el router M_INTERNET no sabe como contestarle a cada uno de ellos ya que solo conoce al router Mikrotik_A.
+#### M_INTERNET
+```
+[admin@MikroTik] > ip route
+[admin@MikroTik] /ip route> add dst-address=192.168.0.0/16 gateway=200.18.17.9
+[admin@MikroTik] /ip route>
+```
+### Configuración de las PC
+#### En la PC4
+```
+PC4> ip 192.168.6.2 255.255.255.0 192.168.6.1
+```
+#### En la PC5
+```
+PC5> ip 192.168.8.2 255.255.255.0 192.168.8.1
+```
+#### En la PC6
+```
+PC6> ip 192.168.10.2 255.255.255.0 192.168.10.1
+```
+### Pruebas ICMP
+#### En la PC4
+```
+PC4> ping 192.168.8.2
+84 bytes from 192.168.8.2 icmp_seq=1 ttl=62 time=1.936 ms
+84 bytes from 192.168.8.2 icmp_seq=2 ttl=62 time=1.332 ms
+84 bytes from 192.168.8.2 icmp_seq=3 ttl=62 time=1.357 ms
+84 bytes from 192.168.8.2 icmp_seq=4 ttl=62 time=1.394 ms
+84 bytes from 192.168.8.2 icmp_seq=5 ttl=62 time=1.358 ms
+
+PC4> ping 192.168.10.2
+84 bytes from 192.168.10.2 icmp_seq=1 ttl=61 time=2.861 ms
+84 bytes from 192.168.10.2 icmp_seq=2 ttl=61 time=2.192 ms
+84 bytes from 192.168.10.2 icmp_seq=3 ttl=61 time=1.704 ms
+84 bytes from 192.168.10.2 icmp_seq=4 ttl=61 time=1.793 ms
+84 bytes from 192.168.10.2 icmp_seq=5 ttl=61 time=1.829 ms
+
+PC4> ping 60.100.0.10
+84 bytes from 60.100.0.10 icmp_seq=1 ttl=63 time=1.428 ms
+84 bytes from 60.100.0.10 icmp_seq=2 ttl=63 time=1.010 ms
+84 bytes from 60.100.0.10 icmp_seq=3 ttl=63 time=0.989 ms
+84 bytes from 60.100.0.10 icmp_seq=4 ttl=63 time=0.996 ms
+84 bytes from 60.100.0.10 icmp_seq=5 ttl=63 time=1.021 ms
+```
+#### En la PC5
+```
+PC5> ping 192.168.6.2
+84 bytes from 192.168.6.2 icmp_seq=1 ttl=62 time=1.791 ms
+84 bytes from 192.168.6.2 icmp_seq=2 ttl=62 time=1.438 ms
+84 bytes from 192.168.6.2 icmp_seq=3 ttl=62 time=1.340 ms
+84 bytes from 192.168.6.2 icmp_seq=4 ttl=62 time=1.279 ms
+84 bytes from 192.168.6.2 icmp_seq=5 ttl=62 time=1.383 ms
+
+PC5> ping 192.168.10.2
+84 bytes from 192.168.10.2 icmp_seq=1 ttl=62 time=1.601 ms
+84 bytes from 192.168.10.2 icmp_seq=2 ttl=62 time=1.666 ms
+84 bytes from 192.168.10.2 icmp_seq=3 ttl=62 time=1.445 ms
+84 bytes from 192.168.10.2 icmp_seq=4 ttl=62 time=1.333 ms
+84 bytes from 192.168.10.2 icmp_seq=5 ttl=62 time=1.292 ms
+
+PC5> ping 60.100.0.10
+84 bytes from 60.100.0.10 icmp_seq=1 ttl=62 time=1.765 ms
+84 bytes from 60.100.0.10 icmp_seq=2 ttl=62 time=1.429 ms
+84 bytes from 60.100.0.10 icmp_seq=3 ttl=62 time=1.483 ms
+84 bytes from 60.100.0.10 icmp_seq=4 ttl=62 time=1.578 ms
+84 bytes from 60.100.0.10 icmp_seq=5 ttl=62 time=1.305 ms
+```
+#### En la PC6
+```
+PC6> ping 192.168.6.2
+84 bytes from 192.168.6.2 icmp_seq=1 ttl=61 time=2.231 ms
+84 bytes from 192.168.6.2 icmp_seq=2 ttl=61 time=1.724 ms
+84 bytes from 192.168.6.2 icmp_seq=3 ttl=61 time=1.674 ms
+84 bytes from 192.168.6.2 icmp_seq=4 ttl=61 time=1.944 ms
+84 bytes from 192.168.6.2 icmp_seq=5 ttl=61 time=1.817 ms
+
+PC6> ping 192.168.8.2
+84 bytes from 192.168.8.2 icmp_seq=1 ttl=62 time=1.492 ms
+84 bytes from 192.168.8.2 icmp_seq=2 ttl=62 time=1.381 ms
+84 bytes from 192.168.8.2 icmp_seq=3 ttl=62 time=1.939 ms
+84 bytes from 192.168.8.2 icmp_seq=4 ttl=62 time=1.506 ms
+84 bytes from 192.168.8.2 icmp_seq=5 ttl=62 time=1.323 ms
+
+PC6> ping 60.100.0.10
+84 bytes from 60.100.0.10 icmp_seq=1 ttl=61 time=2.691 ms
+84 bytes from 60.100.0.10 icmp_seq=2 ttl=61 time=2.147 ms
+84 bytes from 60.100.0.10 icmp_seq=3 ttl=61 time=1.735 ms
+84 bytes from 60.100.0.10 icmp_seq=4 ttl=61 time=1.464 ms
+84 bytes from 60.100.0.10 icmp_seq=5 ttl=61 time=1.836 ms
+```
