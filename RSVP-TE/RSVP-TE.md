@@ -1,5 +1,7 @@
 # RSVP-TE
 ## CISCO 7200
+### Topología
+![topologia](./img/CISCO_RSVP-TE.png)
 ### Configuraciones
 Primero congiguramos los las interfaces de cada router y su protocolo de routeo. en este caso trabajamos con OSPF.
 #### Router A
